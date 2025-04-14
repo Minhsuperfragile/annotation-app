@@ -1,164 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Text & Annotation Editor</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    #container {
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-      margin-top: 20px;
-      gap: 20px;
-    }
-    .panel {
-      flex: 1;
-      padding: 20px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      min-height: 200px;
-    }
-    textarea {
-      width: 100%;
-      height: 100%;
-      border: none;
-      resize: none;
-      font-size: 16px;
-      outline: none;
-    }
-    .controls {
-      margin-top: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-    input[type="number"] {
-      padding: 8px;
-      font-size: 16px;
-      width: 100px;
-    }
-    #row-indicator {
-      margin-top: 10px;
-      font-style: italic;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XLSX Editor</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .pane {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+        }
+        .left {
+            margin-right: 5px;
+        }
+        .right {
+            margin-left: 5px;
+        }
+        textarea {
+            width: 100%;
+            height: 80%;
+            resize: none;
+        }
+        .controls {
+            text-align: center;
+            padding: 10px;
+        }
+        button {
+            margin: 5px;
+        }
+    </style>
 </head>
 <body>
-
-  <h1>Text & Annotation Editor</h1>
-  <input type="file" id="file-input" accept=".xlsx" />
-
-  <div class="controls" style="display: none;" id="nav-controls">
-    <button id="next-btn">Next</button>
-    <input type="number" id="row-input" min="1" placeholder="Row #" />
-    <button id="go-btn">Go to Row</button>
-    <div id="row-indicator"></div>
-  </div>
-
-  <div id="container" style="display: none;">
-    <div class="panel">
-      <h3>Text</h3>
-      <textarea id="text-area"></textarea>
+    <input type="file" id="fileInput" accept=".xlsx">
+    <div class="container">
+        <div class="pane left">
+            <h3>Text</h3>
+            <textarea id="textArea"></textarea>
+        </div>
+        <div class="pane right">
+            <h3>Annotation</h3>
+            <textarea id="annotationArea"></textarea>
+        </div>
     </div>
-    <div class="panel">
-      <h3>Annotation</h3>
-      <textarea id="annotation-text"></textarea>
+    <div class="controls">
+        <button onclick="prevRow()">Previous</button>
+        <button onclick="nextRow()">Next</button>
+        <button onclick="saveFile()">Save</button>
     </div>
-  </div>
 
-  <script>
-    let data = [];
-    let currentIndex = 0;
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script>
+        let workbook, sheet, data = [], currentRow = 0;
 
-    const fileInput = document.getElementById('file-input');
-    const textArea = document.getElementById('text-area');
-    const annotationTextarea = document.getElementById('annotation-text');
-    const nextBtn = document.getElementById('next-btn');
-    const container = document.getElementById('container');
-    const navControls = document.getElementById('nav-controls');
-    const rowIndicator = document.getElementById('row-indicator');
-    const rowInput = document.getElementById('row-input');
-    const goBtn = document.getElementById('go-btn');
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                workbook = XLSX.read(e.target.result, { type: 'array' });
+                sheet = workbook.Sheets[workbook.SheetNames[0]];
+                data = XLSX.utils.sheet_to_json(sheet);
+                currentRow = 0;
+                displayRow();
+            };
+            reader.readAsArrayBuffer(file);
+        });
 
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-
-      reader.onload = (event) => {
-        const dataArray = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(dataArray, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        if (data.length > 1) {
-          currentIndex = 1; // Skip header
-          container.style.display = 'flex';
-          navControls.style.display = 'flex';
-          showRow();
+        function displayRow() {
+            if (data.length === 0) return;
+            document.getElementById('textArea').value = data[currentRow].text || '';
+            document.getElementById('annotationArea').value = data[currentRow].annotation || '';
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    });
+        function updateRow() {
+            if (data.length === 0) return;
+            data[currentRow].text = document.getElementById('textArea').value;
+            data[currentRow].annotation = document.getElementById('annotationArea').value;
+        }
 
-    function saveCurrentRow() {
-      if (data[currentIndex]) {
-        data[currentIndex][0] = textArea.value;
-        data[currentIndex][1] = annotationTextarea.value;
-      }
-    }
+        function nextRow() {
+            if (data.length === 0) return;
+            updateRow();
+            if (currentRow < data.length - 1) {
+                currentRow++;
+                displayRow();
+            }
+        }
 
-    function showRow() {
-      if (currentIndex >= data.length) {
-        alert('No more rows.');
-        return;
-      }
-      const row = data[currentIndex];
-      textArea.value = row[0] || '';
-      annotationTextarea.value = row[1] || '';
-      rowIndicator.textContent = `Viewing Row ${currentIndex}`;
-    }
+        function prevRow() {
+            if (data.length === 0) return;
+            updateRow();
+            if (currentRow > 0) {
+                currentRow--;
+                displayRow();
+            }
+        }
 
-    nextBtn.addEventListener('click', () => {
-      saveCurrentRow();
-      currentIndex++;
-      showRow();
-    });
-
-    goBtn.addEventListener('click', () => {
-      const target = parseInt(rowInput.value);
-      if (isNaN(target) || target <= 0 || target >= data.length) {
-        alert(`Please enter a valid row number (1 to ${data.length - 1})`);
-        return;
-      }
-      saveCurrentRow();
-      currentIndex = target;
-      showRow();
-    });
-    const downloadBtn = document.getElementById('download-btn');
-
-    downloadBtn.addEventListener('click', () => {
-        saveCurrentRow(); // save current row before exporting
-
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Edited");
-
-        XLSX.writeFile(wb, "edited_data.xlsx");
-    });
-  </script>
-
+        function saveFile() {
+            updateRow();
+            const newSheet = XLSX.utils.json_to_sheet(data);
+            const newWorkbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(newWorkbook, newSheet, 'Sheet1');
+            const wbout = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'array' });
+            saveAs(new Blob([wbout], { type: 'application/octet-stream' }), 'edited_file.xlsx');
+        }
+    </script>
 </body>
 </html>
