@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Text Annotation Viewer</title>
+  <title>Text & Annotation Editor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
@@ -17,7 +17,7 @@
       margin-top: 20px;
       gap: 20px;
     }
-    #text, #annotation {
+    .panel {
       flex: 1;
       padding: 20px;
       border: 1px solid #ccc;
@@ -30,11 +30,23 @@
       border: none;
       resize: none;
       font-size: 16px;
+      outline: none;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     button {
-      margin-top: 20px;
       padding: 10px 20px;
       font-size: 16px;
+    }
+    input[type="number"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 100px;
     }
     #row-indicator {
       margin-top: 10px;
@@ -44,27 +56,40 @@
 </head>
 <body>
 
-  <h1>Text Annotation Viewer</h1>
+  <h1>Text & Annotation Editor</h1>
   <input type="file" id="file-input" accept=".xlsx" />
+
+  <div class="controls" style="display: none;" id="nav-controls">
+    <button id="next-btn">Next</button>
+    <input type="number" id="row-input" min="1" placeholder="Row #" />
+    <button id="go-btn">Go to Row</button>
+    <div id="row-indicator"></div>
+  </div>
+
   <div id="container" style="display: none;">
-    <div id="text"></div>
-    <div id="annotation">
+    <div class="panel">
+      <h3>Text</h3>
+      <textarea id="text-area"></textarea>
+    </div>
+    <div class="panel">
+      <h3>Annotation</h3>
       <textarea id="annotation-text"></textarea>
     </div>
   </div>
-  <button id="next-btn" style="display: none;">Next</button>
-  <div id="row-indicator"></div>
 
   <script>
     let data = [];
     let currentIndex = 0;
 
     const fileInput = document.getElementById('file-input');
-    const textDiv = document.getElementById('text');
+    const textArea = document.getElementById('text-area');
     const annotationTextarea = document.getElementById('annotation-text');
     const nextBtn = document.getElementById('next-btn');
     const container = document.getElementById('container');
+    const navControls = document.getElementById('nav-controls');
     const rowIndicator = document.getElementById('row-indicator');
+    const rowInput = document.getElementById('row-input');
+    const goBtn = document.getElementById('go-btn');
 
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -80,7 +105,7 @@
         if (data.length > 1) {
           currentIndex = 1; // Skip header
           container.style.display = 'flex';
-          nextBtn.style.display = 'inline-block';
+          navControls.style.display = 'flex';
           showRow();
         }
       };
@@ -88,27 +113,50 @@
       reader.readAsArrayBuffer(file);
     });
 
+    function saveCurrentRow() {
+      if (data[currentIndex]) {
+        data[currentIndex][0] = textArea.value;
+        data[currentIndex][1] = annotationTextarea.value;
+      }
+    }
+
     function showRow() {
       if (currentIndex >= data.length) {
         alert('No more rows.');
         return;
       }
-
       const row = data[currentIndex];
-      const text = row[0] || '';
-      const annotation = row[1] || '';
-
-      textDiv.textContent = text;
-      annotationTextarea.value = annotation;
-
-      rowIndicator.textContent = `Row ${currentIndex}`;
+      textArea.value = row[0] || '';
+      annotationTextarea.value = row[1] || '';
+      rowIndicator.textContent = `Viewing Row ${currentIndex}`;
     }
 
     nextBtn.addEventListener('click', () => {
-      // Save annotation if needed
-      data[currentIndex][1] = annotationTextarea.value;
+      saveCurrentRow();
       currentIndex++;
       showRow();
+    });
+
+    goBtn.addEventListener('click', () => {
+      const target = parseInt(rowInput.value);
+      if (isNaN(target) || target <= 0 || target >= data.length) {
+        alert(`Please enter a valid row number (1 to ${data.length - 1})`);
+        return;
+      }
+      saveCurrentRow();
+      currentIndex = target;
+      showRow();
+    });
+    const downloadBtn = document.getElementById('download-btn');
+
+    downloadBtn.addEventListener('click', () => {
+        saveCurrentRow(); // save current row before exporting
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Edited");
+
+        XLSX.writeFile(wb, "edited_data.xlsx");
     });
   </script>
 
