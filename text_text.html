@@ -82,6 +82,10 @@
             margin: 0 10px;
             display: inline-block;
         }
+        #gotoInput {
+            width: 60px;
+            margin: 0 5px;
+        }
     </style>
 </head>
 <body>
@@ -100,6 +104,8 @@
         <button onclick="prevRow()">Previous</button>
         <span id="rowDisplay">Row: 0 / 0</span>
         <button onclick="nextRow()">Next</button>
+        <input type="number" id="gotoInput" min="1" placeholder="Row #">
+        <button onclick="gotoRow()">Go</button>
         <button onclick="saveFile()">Save</button>
     </div>
 
@@ -155,6 +161,20 @@
                 currentRow--;
                 displayRow();
             }
+        }
+
+        function gotoRow() {
+            if (data.length === 0) return;
+            const input = document.getElementById('gotoInput').value;
+            const rowNum = parseInt(input) - 1; // Convert to 0-based index
+            if (isNaN(rowNum) || rowNum < 0 || rowNum >= data.length) {
+                alert('Please enter a valid row number between 1 and ' + data.length);
+                return;
+            }
+            updateRow();
+            currentRow = rowNum;
+            displayRow();
+            document.getElementById('gotoInput').value = ''; // Clear input
         }
 
         function saveFile() {
