@@ -1,61 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Image Text Editor</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    header, footer {
-      padding: 10px;
-      background: #eee;
-    }
-    main {
-      flex: 1;
-      display: flex;
-    }
-    #image-container {
-      width: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background-color: #f9f9f9;
-    }
-    #image-container img {
-      max-width: 100%;
-      max-height: 100%;
-    }
-    #text-container {
-      width: 50%;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    textarea {
-      width: 100%;
-      height: 100%;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    #filename-input {
-      margin-left: 10px;
-      padding: 5px;
-      font-size: 14px;
-      width: 200px;
-    }
-  </style>
-</head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Text Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      header, footer {
+        padding: 10px;
+        background: #eee;
+      }
+      main {
+        flex: 1;
+        display: flex;
+      }
+      #image-container {
+        width: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #f9f9f9;
+      }
+      #image-container img {
+        max-width: 100%;
+        max-height: 100%;
+      }
+      #text-container {
+        width: 50%;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      textarea {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        font-size: 16px;
+      }
+      #filename-input {
+        margin-left: 10px;
+        padding: 5px;
+        font-size: 14px;
+        width: 200px;
+      }
+    </style>
+  </head>
 <body>
   <header>
     <input type="file" id="file-input" accept=".xlsx" />
     <input type="text" id="filename-input" value="edited_output.xlsx" />
     <button id="download-button">Download Edited File</button>
+    <span style="float: right; font-size: 16px; margin-right: 10px;">
+      Row: <span id="row-number"></span> | Edited Rows: <span id="edited-count">0</span>
+    </span>
   </header>
   <main>
     <div id="image-container">
@@ -68,13 +71,25 @@
   <footer>
     <button id="next-button">Save & Next</button>
   </footer>
-
+  <footer>
+    <button id="prev-button">Previous</button>
+    <button id="replace-button">Find & Replace</button>
+  </footer>
   <script>
     let workbook, worksheet, data = [], currentIndex = 0;
+    let fileUploaded = false;
+    let fileDownloaded = false;
 
-    document.getElementById('file-input').addEventListener('change', handleFile, false);
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      fileUploaded = true;
+      fileDownloaded = false;
+      handleFile(e);
+    });
+
     document.getElementById('next-button').addEventListener('click', saveAndNext);
     document.getElementById('download-button').addEventListener('click', downloadEditedFile);
+    document.getElementById('prev-button').addEventListener('click', goToPrevious);
+    document.getElementById('replace-button').addEventListener('click', findAndReplace);
 
     function handleFile(event) {
       const file = event.target.files[0];
@@ -85,29 +100,20 @@
         worksheet = workbook.Sheets[workbook.SheetNames[0]];
         data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
         currentIndex = findFirstUneditedIndex();
+        updateEditedCount();
         displayCurrentPair();
       };
       reader.readAsArrayBuffer(file);
     }
 
-    function findFirstUneditedIndex() {
+    function updateEditedCount() {
+      let editedCount = 0;
       for (let i = 0; i < data.length; i++) {
-        if (!data[i][2] || data[i][2].toLowerCase() !== 'edited') {
-          return i;
+        if (data[i][2] && data[i][2].toLowerCase() === 'edited') {
+          editedCount++;
         }
       }
-      return 0; // fallback to start
-    }
-
-    function displayCurrentPair() {
-      if (currentIndex >= data.length) return;
-      const row = data[currentIndex];
-      if (!row) return;
-      const imagePath = row[0] || '';
-      const text = row[1] || '';
-      const normalizedPath = `images/${imagePath.replace(/^.*[\\\/]/, '')}`;
-      document.getElementById('image-display').src = normalizedPath;
-      document.getElementById('text-editor').value = text;
+      document.getElementById('edited-count').textContent = editedCount;
     }
 
     function saveAndNext() {
@@ -116,7 +122,49 @@
       data[currentIndex][1] = editedText;
       data[currentIndex][2] = 'edited';
       currentIndex++;
+      updateEditedCount();
       displayCurrentPair();
+    }
+
+    function findFirstUneditedIndex() {
+      for (let i = 0; i < data.length; i++) {
+        if (!data[i][2] || data[i][2].toLowerCase() !== 'edited') {
+          return i;
+        }
+      }
+      return 0;
+    }
+
+    function displayCurrentPair() {
+      if (currentIndex >= data.length) return;
+      const row = data[currentIndex];
+      if (!row) return;
+      const imagePath = row[0] || '';
+      const text = row[1] || '';
+      const normalizedPath = `new_data/${imagePath.replace(/^.*[\\\/]/, '')}`;
+      document.getElementById('image-display').src = imagePath;
+      document.getElementById('text-editor').value = text;
+    }
+
+    function goToPrevious() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        displayCurrentPair();
+      } else {
+        alert("You're at the first item.");
+      }
+    }
+
+    function findAndReplace() {
+      const findWord = prompt("Enter the word to find:");
+      if (!findWord) return;
+      const replaceWord = prompt(`Replace "${findWord}" with:`);
+      if (replaceWord === null) return;
+
+      const editor = document.getElementById('text-editor');
+      const originalText = editor.value;
+      const replacedText = originalText.replaceAll(findWord, replaceWord);
+      editor.value = replacedText;
     }
 
     function fileExists(filename, callback) {
@@ -142,8 +190,17 @@
         const newWorkbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Sheet1');
         XLSX.writeFile(newWorkbook, filename);
+        fileDownloaded = true;
       });
     }
+
+    window.addEventListener('beforeunload', function (e) {
+      if (fileUploaded && !fileDownloaded) {
+        const confirmationMessage = 'Bạn có chắc chắn muốn rời đi? File đã upload nhưng chưa được tải về.';
+        e.returnValue = confirmationMessage;
+        return confirmationMessage;
+      }
+    });
   </script>
 </body>
 </html>
